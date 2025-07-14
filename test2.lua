@@ -1,63 +1,53 @@
 --------------------------------------------------------------------
--- FollowBehindScript  ★ LocalScript ★
---  - 画面左上にプレイヤー一覧を表示（自動更新）
---  - クリックしたプレイヤーの背後 3 stud に追従
---  - 同じボタン or ⏸ 停止ボタンで解除
+-- FollowBehindScript  ▶︎ LocalScript ◀︎
+--   ・UI で相手を選択 → 背後 3 stud に常時追従
+--   ・R6 / R15 どちらでも OK（Torso フォールバック付き）
+--   ・同じボタンを再クリック or ⏸ 停止ボタンで解除
 --------------------------------------------------------------------
-
-----------------------
--- 0. サービス取得
-----------------------
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-----------------------
--- 1. 変数
-----------------------
-local localPlr       = Players.LocalPlayer
-local currentTarget  = nil           -- 今追っている相手 (Player)
-local buttons        = {}            -- [Player] = TextButton
-local BACK_OFFSET    = 3             -- 背後距離（+Z が背後）
+local localPlr      = Players.LocalPlayer
+local currentTarget = nil                    -- 今追いかけている相手
+local buttons       = {}                     -- [Player] = TextButton
+local BACK_OFFSET   = 3                      -- 背後 3 stud（+Z が背後）
 
 --------------------------------------------------------------------
--- 2. UI 生成
+-- ① UI 生成
 --------------------------------------------------------------------
-local gui   = Instance.new("ScreenGui")
-gui.Name           = "FollowGui"
-gui.IgnoreGuiInset = true
-gui.ResetOnSpawn   = false
-gui.Parent         = localPlr:WaitForChild("PlayerGui")
+local gui = Instance.new("ScreenGui")
+gui.Name, gui.IgnoreGuiInset, gui.ResetOnSpawn =
+    "FollowGui", true, false
+gui.Parent = localPlr:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size                   = UDim2.new(0, 220, 0, 340)
-frame.Position               = UDim2.new(0, 20, 0, 100)
-frame.BackgroundColor3       = Color3.fromRGB(35, 35, 35)
+frame.Size  = UDim2.new(0, 220, 0, 340)
+frame.Position = UDim2.new(0, 20, 0, 100)
+frame.BackgroundColor3 = Color3.fromRGB(35,35,35)
 frame.BackgroundTransparency = 0.05
-frame.BorderSizePixel        = 0
+frame.BorderSizePixel = 0
 frame.Active, frame.Draggable = true, true
 frame.Parent = gui
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 32)
 title.Text = "🎯 追従ターゲット"
-title.Font = Enum.Font.SourceSansBold
 title.TextScaled = true
+title.Font = Enum.Font.SourceSansBold
 title.TextColor3 = Color3.new(1,1,1)
 title.BackgroundTransparency = 1
 title.Parent = frame
 
--- ⏸ 停止ボタン
 local stopBtn = Instance.new("TextButton")
 stopBtn.Size  = UDim2.new(1, -10, 0, 30)
 stopBtn.Position = UDim2.new(0, 5, 0, 38)
 stopBtn.Text = "⏸ 追従停止"
 stopBtn.TextScaled = true
 stopBtn.Font = Enum.Font.SourceSans
-stopBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+stopBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
 stopBtn.TextColor3 = Color3.new(1,1,1)
 stopBtn.Parent = frame
 
--- スクロールリスト
 local list = Instance.new("ScrollingFrame")
 list.Position = UDim2.new(0, 0, 0, 72)
 list.Size     = UDim2.new(1, 0, 1, -72)
@@ -72,9 +62,9 @@ layout.Padding   = UDim.new(0, 4)
 layout.Parent    = list
 
 --------------------------------------------------------------------
--- 3. ボタン生成・更新関数
+-- ② ボタン生成／削除／ハイライト
 --------------------------------------------------------------------
-local function refreshHighlights()
+local function highlight()
 	for plr, btn in pairs(buttons) do
 		btn.BackgroundColor3 = (plr == currentTarget)
 			and Color3.fromRGB(0,120,215)
@@ -84,11 +74,10 @@ local function refreshHighlights()
 	                                            or  Color3.fromRGB(80,80,80)
 end
 
-local function createButton(plr)
+local function addButton(plr)
 	if plr == localPlr or buttons[plr] then return end
-
 	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1, -10, 0, 28)
+	btn.Size  = UDim2.new(1, -10, 0, 28)
 	btn.Position = UDim2.new(0, 5, 0, 0)
 	btn.Text = plr.DisplayName
 	btn.TextScaled = true
@@ -100,61 +89,60 @@ local function createButton(plr)
 
 	btn.Activated:Connect(function()
 		currentTarget = (currentTarget == plr) and nil or plr
-		refreshHighlights()
+		highlight()
 	end)
 end
 
 local function removeButton(plr)
-	local btn = buttons[plr]
-	if btn then btn:Destroy() end
+	local b = buttons[plr]
+	if b then b:Destroy() end
 	buttons[plr] = nil
 	if currentTarget == plr then currentTarget = nil end
-	refreshHighlights()
+	highlight()
 end
 
-local function rebuildList()
-	-- 一度全削除
+local function rebuild()
 	for plr in pairs(buttons) do
 		removeButton(plr)
 	end
-	-- 再作成
 	for _, plr in ipairs(Players:GetPlayers()) do
-		createButton(plr)
+		addButton(plr)
 	end
 	list.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y)
 end
 
---------------------------------------------------------------------
--- 4. イベント接続
---------------------------------------------------------------------
-stopBtn.Activated:Connect(function()
-	currentTarget = nil
-	refreshHighlights()
-end)
-
 Players.PlayerAdded:Connect(function(plr)
-	createButton(plr)
+	addButton(plr)
 	list.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y)
 end)
-
 Players.PlayerRemoving:Connect(removeButton)
+stopBtn.Activated:Connect(function()
+	currentTarget = nil
+	highlight()
+end)
 
-rebuildList()  -- 初期化
+rebuild()
 
 --------------------------------------------------------------------
--- 5. 追従処理 (RenderStepped)
+-- ③ 追従ロジック
 --------------------------------------------------------------------
+-- R6 互換: HumanoidRootPart がなければ Torso を返す
+local function getRoot(char)
+	return char:FindFirstChild("HumanoidRootPart")
+	    or char:FindFirstChild("Torso")
+end
+
 RunService.RenderStepped:Connect(function()
 	if not currentTarget then return end
 
-	local myChar     = localPlr.Character or localPlr.CharacterAdded:Wait()
+	local myChar = localPlr.Character or localPlr.CharacterAdded:Wait()
 	local targetChar = currentTarget.Character
-	if not targetChar then return end  -- 相手がリスポーン中はスキップ
+	if not targetChar then return end  -- リスポーン待ち
 
-	local myHRP      = myChar:FindFirstChild("HumanoidRootPart")
-	local trgHRP     = targetChar:FindFirstChild("HumanoidRootPart")
-	if not (myHRP and trgHRP) then return end
+	local myRoot  = getRoot(myChar)
+	local trgRoot = getRoot(targetChar)
+	if not (myRoot and trgRoot) then return end
 
 	-- 背後 3 stud（+Z が背後）
-	myHRP.CFrame = trgHRP.CFrame * CFrame.new(0, 0, BACK_OFFSET)
+	myRoot.CFrame = trgRoot.CFrame * CFrame.new(0, 0, BACK_OFFSET)
 end)
